@@ -28,6 +28,12 @@
     regexp: '^#includedir .*'
     validate: visudo -cf %s
 
+- name: Gather existing sudoers.d files.
+  find:
+    paths: "{{ sudo_sudoersd_dir }}"
+    patterns: "*"
+  register: existing_sudoers_files
+
 - name: Apply sudoers defaults configuration
   template:
     src: 'etc-sudoers.d-defaults_template.j2'
@@ -64,6 +70,16 @@
     - (item.state | default('present')) != "absent"
   loop: "{{ sudo_grouplist_all }}"
 
+- name: List sudoers group configuration
+  vars:
+    file_path: "{{ sudo_sudoersd_dir }}/{{ item.sudoers_file|default('10' + item.name) }}"
+  set_fact:
+    generated_files: "{{ generated_files|default([]) + [file_path] }}"
+  when:
+    - item.sudo is defined
+    - (item.state | default('present')) != "absent"
+  loop: "{{ sudo_grouplist_all }}"
+
 - name: Cleanup sudoers configuration for absent groups
   file:
     path: "{{ sudo_sudoersd_dir }}/{{ item.sudoers_file|default('10' + item.name) }}"
@@ -85,6 +101,16 @@
     - (item.state | default('present')) != "absent"
   loop: "{{ sudo_list_all }}"
 
+- name: List sudoers user configuration
+  vars:
+    file_path: "{{ sudo_sudoersd_dir }}/{{ item.sudoers_file|default('20' + item.name) }}"
+  set_fact:
+    generated_files: "{{ generated_files|default([]) + [file_path] }}"
+  when:
+    - item.sudo is defined
+    - (item.state | default('present')) != "absent"
+  loop: "{{ sudo_list_all }}"
+
 - name: Cleanup sudoers configuration for absent users
   file:
     path: "{{ sudo_sudoersd_dir }}/{{ item.sudoers_file|default('20' + item.name) }}"
@@ -92,3 +118,18 @@
   when:
     - (item.state | default('present')) == "absent"
   loop: "{{ sudo_list_all }}"
+
+- name: Remove existing sudoers.d files if required
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  when:
+    - sudo_clear_existing|bool
+    - item.path not in generated_files
+  loop: "{{ existing_sudoers_files.files }}"
+
+- name: Debug output of generated files
+  debug: var=generated_files
+
+- name: Debug output of existing files
+  debug: var=existing_sudoers_files.files

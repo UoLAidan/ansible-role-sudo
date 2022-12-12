@@ -49,3 +49,6 @@ sudo_sudoersd_owner: root
 
 # Group for files
 sudo_sudoersd_group: root
+
+# Clear existing files in sudoers.d
+sudo_clear_existing: no
